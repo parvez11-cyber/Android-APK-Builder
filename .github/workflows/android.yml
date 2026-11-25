@@ -1,3 +1,4 @@
+
 name: HomeMonitor APK Builder
 
 on:
@@ -14,6 +15,10 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
+    env:
+      ANDROID_HOME: /usr/local/lib/android/sdk
+      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -24,12 +29,28 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Install Android SDK
+      - name: Accept Android SDK Licenses
         run: |
-          sdkmanager "platforms;android-35" "build-tools;35.0.0"
+          echo "Finding SDK Manager..."
+          SDKMANAGER=$(find "$ANDROID_HOME/cmdline-tools" \
+            -type f -name sdkmanager | sort | tail -n 1)
+
+          if [ -z "$SDKMANAGER" ]; then
+            echo "SDK Manager not found!"
+            exit 1
+          fi
+
+          echo "Using: $SDKMANAGER"
+          yes | "$SDKMANAGER" --licenses || true
+
+      - name: Install Android SDK Packages
+        run: |
+          SDKMANAGER=$(find "$ANDROID_HOME/cmdline-tools" \
+            -type f -name sdkmanager | sort | tail -n 1)
+
+          "$SDKMANAGER" "platform-tools" \
+            "platforms;android-35" \
+            "build-tools;35.0.0"
 
       - name: Setup Gradle 8.7
         uses: gradle/actions/setup-gradle@v4
@@ -54,11 +75,11 @@ jobs:
             -name settings.gradle.kts -printf '%h\n' | head -n 1)
 
           if [ -z "$PROJECT_DIR" ]; then
-            echo "settings.gradle.kts not found!"
+            echo "Project not found!"
             exit 1
           fi
 
-          echo "PROJECT_DIR=$PROJECT_DIR" >> $GITHUB_ENV
+          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
 
       - name: Build Debug APK
         run: |
